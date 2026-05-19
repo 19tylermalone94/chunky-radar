@@ -173,6 +173,7 @@ type Filters = {
   cats: boolean[];        // index 0..20
   catMissing: boolean;    // category === null
   emergencyOnly: boolean;
+  showCities: boolean;
 };
 const DEFAULT_FILTERS: Filters = {
   airborne: "all",
@@ -183,7 +184,20 @@ const DEFAULT_FILTERS: Filters = {
   cats: Array.from({ length: 21 }, () => true),
   catMissing: true,
   emergencyOnly: false,
+  showCities: true,
 };
+
+// public/data/cities.json — [name, lat, lon, population], sorted desc by pop.
+type City = [string, number, number, number];
+
+function cityPopThreshold(z: number): number {
+  if (z <= 2) return 5_000_000;
+  if (z === 3) return 2_000_000;
+  if (z === 4) return 1_000_000;
+  if (z === 5) return 500_000;
+  if (z === 6) return 250_000;
+  return 100_000;
+}
 
 const CATEGORY_SHORT: Record<number, string> = {
   0: "UNKNOWN",
@@ -549,6 +563,9 @@ export default function FlightTracker() {
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
   const [enrichmentLoading, setEnrichmentLoading] = useState(false);
+  // City dataset loaded once. Held in a ref so the canvas effect reads
+  // the latest copy without needing to re-bind.
+  const citiesRef = useRef<City[]>([]);
 
   // Fetch FlightAware enrichment whenever the selected aircraft's identity changes.
   const selId = selectedAircraft?.id ?? null;
@@ -596,6 +613,20 @@ export default function FlightTracker() {
   useEffect(() => {
     const id = window.setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
     return () => window.clearInterval(id);
+  }, []);
+
+  // Fetch cities once.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/data/cities.json")
+      .then((r) => r.json())
+      .then((data: City[]) => {
+        if (cancelled) return;
+        citiesRef.current = data;
+        dirtyRef.current = true;
+      })
+      .catch((e) => console.warn("cities load failed:", e));
+    return () => { cancelled = true; };
   }, []);
 
   function patchFilters(patch: Partial<Filters>) {
@@ -826,6 +857,57 @@ export default function FlightTracker() {
           }
         }
         charCtx.globalAlpha = 1.0;
+      }
+
+      // Cities
+      if (filtersRef.current.showCities && citiesRef.current.length > 0) {
+        const z = Math.floor(view.zoom);
+        const popMin = cityPopThreshold(z);
+        const b = getBounds();
+        // Track label rects per frame to avoid overlapping labels.
+        const placed: { x: number; y: number; w: number; h: number }[] = [];
+        charCtx.font = `13px "VT323", "Courier New", monospace`;
+        charCtx.textBaseline = "middle";
+        charCtx.textAlign = "left";
+        charCtx.shadowColor = "rgba(0,0,0,0.95)";
+        charCtx.shadowBlur = 3;
+
+        // Cities are sorted by population desc; bigger ones get priority for label space.
+        for (const [name, lat, lon, pop] of citiesRef.current) {
+          if (pop < popMin) break;
+          if (lat < b.minLat || lat > b.maxLat) continue;
+          // Longitude wrap-aware check
+          if (b.minLon < b.maxLon) {
+            if (lon < b.minLon || lon > b.maxLon) continue;
+          } else if (lon < b.minLon && lon > b.maxLon) continue;
+
+          const s = latLonToScreen(lat, lon);
+          if (s.x < -50 || s.x > cw + 50 || s.y < -10 || s.y > ch + 10) continue;
+
+          // Marker dot.
+          charCtx.fillStyle = "#ff5";
+          charCtx.beginPath();
+          charCtx.arc(s.x, s.y, 1.8, 0, Math.PI * 2);
+          charCtx.fill();
+
+          // Label, with simple overlap avoidance.
+          const tw = charCtx.measureText(name).width;
+          const th = 12;
+          const lx = s.x + 4;
+          const ly = s.y - 7;
+          let overlap = false;
+          for (const r of placed) {
+            if (lx < r.x + r.w && lx + tw > r.x && ly < r.y + r.h && ly + th > r.y) {
+              overlap = true;
+              break;
+            }
+          }
+          if (overlap) continue;
+          placed.push({ x: lx, y: ly, w: tw, h: th });
+          charCtx.fillStyle = "#fff";
+          charCtx.fillText(name, lx, s.y);
+        }
+        charCtx.shadowBlur = 0;
       }
 
       // Aircraft
@@ -1360,6 +1442,16 @@ export default function FlightTracker() {
           EMERGENCY ONLY <span className="dim">7500/7600/7700</span>
         </label>
 
+        <h2>MAP</h2>
+        <label>
+          <input
+            type="checkbox"
+            checked={filters.showCities}
+            onChange={(e) => patchFilters({ showCities: e.target.checked })}
+          />
+          CITIES <span className="dim">pop ≥ 100k</span>
+        </label>
+
         <div className="count">
           SHOWING {visibleCount}
           <br />
@@ -1386,6 +1478,9 @@ export default function FlightTracker() {
           <div className="row"><span className="sym" style={{ color: "#fff" }}>*</span> SNOW</div>
           <div className="row" style={{ marginTop: 4 }}>
             <span className="sym" style={{ color: "#ff3cf0" }}>✈︎</span> AIRCRAFT
+          </div>
+          <div className="row">
+            <span className="sym" style={{ color: "#ff5" }}>•</span> CITY
           </div>
         </div>
         <div className="scanlines" />

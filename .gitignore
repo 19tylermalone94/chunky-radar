@@ -24,6 +24,15 @@
 .DS_Store
 *.pem
 
+# editors / agents
+.idea/
+.vscode/
+.claude/
+*.swp
+
+# os
+Thumbs.db
+
 # debug
 npm-debug.log*
 yarn-debug.log*

@@ -74,7 +74,14 @@ async function getToken(): Promise<string | null> {
 }
 
 async function fetchUpstream(upstream: string, retryOn401 = true): Promise<Response> {
-  const token = await getToken();
+  let token: string | null = null;
+  try {
+    token = await getToken();
+  } catch (e) {
+    // Token endpoint blew up. Fall back to anonymous tier so callers
+    // still get data, but log loudly so the failure is visible in logs.
+    console.warn("[states] token fetch failed, falling back to anon:", e);
+  }
   const headers: Record<string, string> = {
     "User-Agent": "chunky-radar/1.0",
   };
@@ -82,7 +89,6 @@ async function fetchUpstream(upstream: string, retryOn401 = true): Promise<Respo
 
   const r = await fetch(upstream, { headers, cache: "no-store" });
   if (r.status === 401 && retryOn401 && token) {
-    // Token may have been revoked / clock skew — refresh and retry once
     globalForCache.__opSkyToken = null;
     return fetchUpstream(upstream, false);
   }
@@ -126,6 +132,7 @@ export async function GET(req: NextRequest) {
       headers: { "x-cache": "MISS", "x-auth": process.env.OPENSKY_CLIENT_ID ? "1" : "0" },
     });
   } catch (e) {
+    console.error("[states] fetch failed:", e);
     if (hit) {
       return NextResponse.json(hit.payload, {
         headers: { "x-cache": "STALE-ERR" },

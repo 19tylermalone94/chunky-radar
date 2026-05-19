@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// OpenSky's network filters US-East cloud IPs. Pin to Frankfurt where
+// they're a regional neighbor and our requests actually go through.
+export const preferredRegion = "fra1";
 
 type CacheEntry = { ts: number; payload: unknown };
 type TokenEntry = { token: string; expiresAt: number };

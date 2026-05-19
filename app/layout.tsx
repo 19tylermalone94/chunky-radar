@@ -15,8 +15,8 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "Fortress Flight Tracker",
-  description: "Pixelated live flight tracker with terrain ASCII overlay",
+  title: "chunky-radar",
+  description: "Pixelated live flight tracker with ASCII terrain overlay",
 };
 
 export default function RootLayout({

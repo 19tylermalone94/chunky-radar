@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# chunky-radar
 
-## Getting Started
+A Dwarf Fortress-style live flight tracker. Pixelated satellite imagery, ASCII terrain overlay, and real-time aircraft positions over a green/amber CRT-styled UI.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+▲ CHUNKY RADAR ▲   BBOX 24,-125 → 50,-65   PLANES 6332   STATUS OK
+┌──────────┐ ~~≈≈♣♣..░░▲▲*  ✈     ~~~~~      ✈    ┌──────────────────┐
+│ AIRSPACE │ ~≈≈♣♣...░░▲▲     ✈    ~~~  ✈        │ UAL2347          │
+│ (•) ALL  │ ≈♣♣...░░░▲     ~~~    ~~      ✈     │ ALT  35,124 ft   │
+│ ALTITUDE │ ♣...░░░▲▲▲    ✈   ~~        ✈       │ SPD  482 kts     │
+│ ...      │ ...░░░░▲▲▲  ~~~~                    │ HDG  274°        │
+└──────────┘ ..░░░▲▲▲▲  ~~                       └──────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Pixelated map** — ESRI World Imagery tiles fetched per viewport, downscaled, color-quantized against a 16-entry retro palette, then upscaled with nearest-neighbor sampling for chunky pixels.
+- **ASCII terrain overlay** — Each chunky pixel is classified into a terrain glyph (`~` ocean, `≈` shallow, `♣` forest, `.` plains, `░` arid, `▲` mountain, `*` snow) and rendered on a second canvas layer.
+- **Live aircraft** — Polled every 10 s via the OpenSky Network. Drawn as a magenta `✈` rotated to the aircraft's true track; emergency squawks (7500/7600/7700) render red.
+- **Filters** — Airspace (all/airborne/ground), altitude bands, vertical trend, callsign + country search, all 21 ADS-B categories with ALL/NONE shortcut, and an emergency-only toggle.
+- **Profile panel** — Click any aircraft for a CRT-styled side panel with a pixelated category photo plus full state-vector fields and FlightAware enrichment (registration, type, operator, origin → destination, status, ASCII progress bar, delays, ETA, filed altitude/airspeed/route, gates).
+- **Pan + zoom** — Click-drag to pan, scroll wheel zooms toward the cursor; wheel input is accumulator-debounced so trackpads don't jump multiple levels per flick.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Stack
 
-## Learn More
+- Next.js 16 (App Router) + React 19, TypeScript
+- Two layered `<canvas>` elements for the map and ASCII/aircraft overlay
+- `next/font` for Press Start 2P (UI chrome) and VT323 (terrain glyphs)
+- No external state library, mapping library, or build plugins
 
-To learn more about Next.js, take a look at the following resources:
+## Running locally
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+cp .env.local.example .env.local   # then fill in real keys
+npm run dev                         # http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Environment variables
 
-## Deploy on Vercel
+All keys are server-side only — the browser only ever talks to the local `/api` routes.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Purpose | Required? |
+|---|---|---|
+| `OPENSKY_CLIENT_ID` | OpenSky OAuth2 client ID | Optional. Without it, the app falls back to the anonymous OpenSky tier (much lower rate limits). |
+| `OPENSKY_CLIENT_SECRET` | OpenSky OAuth2 client secret | Same as above. |
+| `FLIGHTAWARE_API_KEY` | AeroAPI key | Optional. Without it, profile panels show OpenSky data only — no registration/route/schedule enrichment. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Get OpenSky credentials at [opensky-network.org](https://opensky-network.org/) (account → API client). Get an AeroAPI key at [flightaware.com/aeroapi](https://flightaware.com/aeroapi/portal/).
+
+## Architecture
+
+```
+            ┌────────────┐
+ browser ── │  Next.js   │ ── ESRI World Imagery tiles (direct, CORS-friendly)
+            │  app/      │
+            │            │ ── /api/states  → OpenSky /states/all
+            │            │       8 s in-memory cache, bbox key
+            │            │       OAuth2 token cached on globalThis
+            │            │
+            │            │ ── /api/aircraft/[icao24]?callsign=...
+            │            │       FlightAware /flights/{callsign}
+            │            │       60 s in-memory cache, callsign key
+            └────────────┘
+```
+
+The proxies exist because OpenSky's CORS header is locked to `https://opensky-network.org`, so direct browser calls are blocked. The proxies also let many users share one upstream fetch (cache hit) instead of every browser polling independently.
+
+## Deploy
+
+[Deploy to Vercel](https://vercel.com/new) — connect the repo, set the three env vars above in the project settings, and ship. The free Hobby tier easily covers the traffic for a personal share-with-friends app.
+
+### A note on costs and rate limits
+
+This is built as a personal project but the data sources are not free:
+
+- **FlightAware AeroAPI** is **paid per request**. The 60 s server-side cache by callsign means popular planes only hit upstream once a minute regardless of viewer count, but a public URL still exposes you to whatever cost ceiling AeroAPI enforces (or doesn't). Watch your billing.
+- **OpenSky** rate-limits even authenticated requests. The 8 s bbox cache helps a lot but doesn't make you immune.
+
+If you fork this and expect non-trivial traffic, consider adding a per-IP rate limit on the `/api/*` routes or capping AeroAPI usage in your AeroAPI dashboard.
+
+## Credits
+
+- **OpenSky Network** — aircraft state vectors
+- **FlightAware AeroAPI** — flight enrichment
+- **ESRI World Imagery** — map tiles (no key required)
+- **Wikimedia Commons** — category aircraft thumbnails (CC-licensed; resized for `public/aircraft/`)
+- **VT323**, **Press Start 2P** — fonts via Google Fonts
+- Inspired by Dwarf Fortress's ASCII-as-cartography aesthetic

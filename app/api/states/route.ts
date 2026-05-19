@@ -76,7 +76,7 @@ async function getToken(): Promise<string | null> {
 async function fetchUpstream(upstream: string, retryOn401 = true): Promise<Response> {
   const token = await getToken();
   const headers: Record<string, string> = {
-    "User-Agent": "fortress-flight-tracker/1.0",
+    "User-Agent": "chunky-radar/1.0",
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 

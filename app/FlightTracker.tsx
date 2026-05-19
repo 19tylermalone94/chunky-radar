@@ -1165,7 +1165,7 @@ export default function FlightTracker() {
   return (
     <>
       <div className="topbar">
-        <span className="title">▲ FORTRESS FLIGHT TRACKER ▲</span>
+        <span className="title">▲ CHUNKY RADAR ▲</span>
         <span className="sep">│</span>
         <span><span className="label">BBOX</span> {bbox}</span>
         <span className="sep">│</span>
@@ -1412,7 +1412,7 @@ export default function FlightTracker() {
         <span><span className="hint">WHEEL</span> zoom</span>
         <span><span className="hint">HOVER</span> aircraft info</span>
         <span style={{ marginLeft: "auto" }}>
-          ESRI imagery · OpenSky Network · pixelated through the embark dwarves
+          ESRI · OpenSky · FlightAware · rendered chunky-style
         </span>
       </div>
     </>

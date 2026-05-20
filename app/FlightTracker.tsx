@@ -164,6 +164,21 @@ type OpenSkyResponse = {
 
 type Airborne = "all" | "air" | "ground";
 
+type SpotterStats = {
+  total: number;
+  airborne: number;
+  onGround: number;
+  emergency: number;
+  altLow: number; altMid: number; altHigh: number; altUnk: number;
+  climbing: number; level: number; descending: number; vsUnk: number;
+  topOps: [string, number][];
+  topCats: [string, number][];
+  topCountries: [string, number][];
+  srcAdsb: number; srcMlat: number; srcOther: number;
+  maxSpeedKt: number | null;
+  avgAltFt: number | null;
+};
+
 type Filters = {
   airborne: Airborne;
   altLow: boolean; altMid: boolean; altHigh: boolean; altUnknown: boolean;
@@ -548,6 +563,117 @@ function Row({ k, v, sub }: { k: string; v: string; sub?: string }) {
 }
 
 /* ============================================================
+   Spotter panel
+   ============================================================ */
+function SpotterPanel({ stats, onClose }: { stats: SpotterStats; onClose: () => void }) {
+  function bar(n: number, d: number, w = 10): string {
+    const f = d === 0 ? 0 : Math.min(w, Math.round(n / d * w));
+    return "█".repeat(f) + "░".repeat(w - f);
+  }
+  function pct(n: number, d: number): string {
+    return d === 0 ? "  --" : `${Math.round(n / d * 100)}%`.padStart(4);
+  }
+  function rpad(s: string | number, w: number): string {
+    const str = String(s);
+    return str + " ".repeat(Math.max(0, w - str.length));
+  }
+  function lpad(s: string | number, w: number): string {
+    const str = String(s);
+    return " ".repeat(Math.max(0, w - str.length)) + str;
+  }
+
+  const altT = stats.altLow + stats.altMid + stats.altHigh + stats.altUnk;
+  const vsT  = stats.climbing + stats.level + stats.descending + stats.vsUnk;
+  const opMax = stats.topOps[0]?.[1] ?? 1;
+  const catMax = stats.topCats[0]?.[1] ?? 1;
+  const srcT = stats.srcAdsb + stats.srcMlat + stats.srcOther;
+
+  const overviewLines = [
+    `${lpad(stats.total,    4)} IN VIEW`,
+    `${lpad(stats.airborne, 4)} AIRBORNE`,
+    `${lpad(stats.onGround, 4)} ON GROUND`,
+    ...(stats.avgAltFt != null ? [`AVG ${lpad(stats.avgAltFt.toLocaleString(), 7)} FT`] : []),
+    ...(stats.maxSpeedKt != null ? [`MAX ${lpad(stats.maxSpeedKt, 7)} KT`] : []),
+  ].join("\n");
+
+  const altLines = [
+    `LOW  ${bar(stats.altLow,  altT)}${pct(stats.altLow,  altT)}`,
+    `MID  ${bar(stats.altMid,  altT)}${pct(stats.altMid,  altT)}`,
+    `HIGH ${bar(stats.altHigh, altT)}${pct(stats.altHigh, altT)}`,
+    `UNK  ${bar(stats.altUnk,  altT)}${pct(stats.altUnk,  altT)}`,
+  ].join("\n");
+
+  const vsLines = [
+    `▲CLB ${bar(stats.climbing,   vsT)}${pct(stats.climbing,   vsT)}`,
+    `─LVL ${bar(stats.level,      vsT)}${pct(stats.level,      vsT)}`,
+    `▼DSC ${bar(stats.descending, vsT)}${pct(stats.descending, vsT)}`,
+  ].join("\n");
+
+  const opLines = stats.topOps
+    .map(([p, c]) => `${rpad(p, 4)} ${bar(c, opMax, 8)} ${lpad(c, 4)}`)
+    .join("\n");
+
+  const catLines = stats.topCats
+    .map(([label, c]) => `${rpad(label.slice(0, 9), 9)} ${bar(c, catMax, 7)}${pct(c, stats.total)}`)
+    .join("\n");
+
+  const countryLines = stats.topCountries
+    .map(([country, c]) => `${rpad(country.slice(0, 14), 14)} ${lpad(c, 4)}`)
+    .join("\n");
+
+  const srcLines = [
+    ...(stats.srcAdsb > 0 ? [`ADS-B ${bar(stats.srcAdsb, srcT)}${pct(stats.srcAdsb, srcT)}`] : []),
+    ...(stats.srcMlat > 0 ? [`MLAT  ${bar(stats.srcMlat, srcT)}${pct(stats.srcMlat, srcT)}`] : []),
+    ...(stats.srcOther > 0 ? [`OTHER ${bar(stats.srcOther, srcT)}${pct(stats.srcOther, srcT)}`] : []),
+  ].join("\n");
+
+  return (
+    <div className="spotter">
+      <button className="spotter-close" onClick={onClose}>×</button>
+      <div className="spotter-ttl" style={{ marginTop: 0 }}>SPOTTER</div>
+      <div className="spotter-mono">{overviewLines}</div>
+      {stats.emergency > 0 && (
+        <div className="spotter-mono spotter-emerg">{`! ${stats.emergency} EMERGENCY`}</div>
+      )}
+
+      <div className="spotter-ttl">ALTITUDE</div>
+      <div className="spotter-mono">{altLines}</div>
+
+      <div className="spotter-ttl">TREND</div>
+      <div className="spotter-mono">{vsLines}</div>
+
+      {stats.topCats.length > 0 && (
+        <>
+          <div className="spotter-ttl">TYPES</div>
+          <div className="spotter-mono">{catLines}</div>
+        </>
+      )}
+
+      {stats.topOps.length > 0 && (
+        <>
+          <div className="spotter-ttl">OPERATORS</div>
+          <div className="spotter-mono">{opLines}</div>
+        </>
+      )}
+
+      {stats.topCountries.length > 0 && (
+        <>
+          <div className="spotter-ttl">COUNTRIES</div>
+          <div className="spotter-mono">{countryLines}</div>
+        </>
+      )}
+
+      {srcLines && (
+        <>
+          <div className="spotter-ttl">SOURCES</div>
+          <div className="spotter-mono">{srcLines}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Component
    ============================================================ */
 export default function FlightTracker() {
@@ -576,6 +702,8 @@ export default function FlightTracker() {
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
   const [enrichmentLoading, setEnrichmentLoading] = useState(false);
+  const [spotterOpen, setSpotterOpen] = useState(false);
+  const [spotterStats, setSpotterStats] = useState<SpotterStats | null>(null);
   // City dataset loaded once. Held in a ref so the canvas effect reads
   // the latest copy without needing to re-bind.
   const citiesRef = useRef<City[]>([]);
@@ -632,6 +760,7 @@ export default function FlightTracker() {
   const mapDirtyRef = useRef(true);
   const overlayDirtyRef = useRef(true);
   const selectedIdRef = useRef<string | null>(null);
+  const spotterComputeRef = useRef<(() => void) | null>(null);
 
   // Tick "now" once a second so age fields refresh.
   useEffect(() => {
@@ -674,11 +803,13 @@ export default function FlightTracker() {
     filtersRef.current = { ...filtersRef.current, ...patch };
     setFiltersState(filtersRef.current);
     overlayDirtyRef.current = true;
+    spotterComputeRef.current?.();
   }
   function resetFilters() {
     filtersRef.current = { ...DEFAULT_FILTERS };
     setFiltersState(filtersRef.current);
     overlayDirtyRef.current = true;
+    spotterComputeRef.current?.();
   }
 
   useEffect(() => {
@@ -761,6 +892,73 @@ export default function FlightTracker() {
       if (f.emergencyOnly && !emergencyFromSquawk(a.squawk)) return false;
       return true;
     }
+
+    /* ---------- spotter stats ---------- */
+    function computeSpotterStats() {
+      const visible = aircraft.filter(passesFilter);
+      const n = visible.length;
+      let altLow = 0, altMid = 0, altHigh = 0, altUnk = 0;
+      let climbing = 0, level = 0, descending = 0, vsUnk = 0;
+      let emergency = 0, airborne = 0, onGround = 0;
+      let srcAdsb = 0, srcMlat = 0, srcOther = 0;
+      const opCount: Record<string, number> = {};
+      const catCount: Record<number, number> = {};
+      const countryCount: Record<string, number> = {};
+      let maxSpeedKt: number | null = null;
+      let altSum = 0, altCount = 0;
+
+      for (const a of visible) {
+        if (a.onGround) onGround++; else airborne++;
+        if (emergencyFromSquawk(a.squawk)) emergency++;
+
+        const altFt = a.alt != null ? a.alt * 3.28084 : null;
+        if (altFt == null) altUnk++;
+        else if (altFt < 10000) altLow++;
+        else if (altFt < 30000) altMid++;
+        else altHigh++;
+        if (altFt != null) { altSum += altFt; altCount++; }
+
+        const vr = a.vrate;
+        if (vr == null) vsUnk++;
+        else if (vr > 1) climbing++;
+        else if (vr < -1) descending++;
+        else level++;
+
+        if (a.vel != null) {
+          const kt = Math.round(a.vel * 1.94384);
+          if (maxSpeedKt == null || kt > maxSpeedKt) maxSpeedKt = kt;
+        }
+
+        if (a.posSource === 0) srcAdsb++;
+        else if (a.posSource === 2) srcMlat++;
+        else srcOther++;
+
+        const prefix = a.callsign.match(/^([A-Z]{2,4})/)?.[1];
+        if (prefix) opCount[prefix] = (opCount[prefix] ?? 0) + 1;
+
+        if (a.category != null) catCount[a.category] = (catCount[a.category] ?? 0) + 1;
+        if (a.country) countryCount[a.country] = (countryCount[a.country] ?? 0) + 1;
+      }
+
+      const topOps = (Object.entries(opCount) as [string, number][])
+        .sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const topCats = (Object.entries(catCount) as [string, number][])
+        .sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([k, v]) => [CATEGORY_SHORT[Number(k)] ?? `CAT${k}`, v] as [string, number]);
+      const topCountries = (Object.entries(countryCount) as [string, number][])
+        .sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+      setSpotterStats({
+        total: n, airborne, onGround, emergency,
+        altLow, altMid, altHigh, altUnk,
+        climbing, level, descending, vsUnk,
+        topOps, topCats, topCountries,
+        srcAdsb, srcMlat, srcOther,
+        maxSpeedKt,
+        avgAltFt: altCount > 0 ? Math.round(altSum / altCount) : null,
+      });
+    }
+    spotterComputeRef.current = computeSpotterStats;
 
     /* ---------- helpers ---------- */
     function getBounds() {
@@ -1147,6 +1345,7 @@ export default function FlightTracker() {
           if (!fresh) selectedIdRef.current = null;
         }
         logCategoryHistogram(aircraft);
+        computeSpotterStats();
         overlayDirtyRef.current = true;
       } catch (err) {
         lastFetchOk = false;
@@ -1623,6 +1822,9 @@ export default function FlightTracker() {
         <div className="scanlines" />
         <div className="vignette" />
         <div ref={tooltipRef} className="tooltip" style={{ display: "none" }} />
+        {spotterOpen && spotterStats && (
+          <SpotterPanel stats={spotterStats} onClose={() => setSpotterOpen(false)} />
+        )}
       </div>
 
       {selectedAircraft && (
@@ -1644,6 +1846,12 @@ export default function FlightTracker() {
         <span><span className="hint">DRAG</span> pan</span>
         <span><span className="hint">WHEEL</span> zoom</span>
         <span><span className="hint">HOVER</span> aircraft info</span>
+        <button
+          className={`spotter-toggle${spotterOpen ? " spotter-toggle--on" : ""}`}
+          onClick={() => setSpotterOpen(o => !o)}
+        >
+          {spotterOpen ? "▼ SPOTTER" : "▲ SPOTTER"}
+        </button>
         <span style={{ marginLeft: "auto" }}>
           ESRI · OpenSky · FlightAware · rendered chunky-style
         </span>

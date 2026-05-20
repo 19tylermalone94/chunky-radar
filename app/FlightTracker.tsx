@@ -979,10 +979,16 @@ export default function FlightTracker() {
     }
 
     /* ---------- fetch ---------- */
+    // NEXT_PUBLIC_STATES_BASE_URL points at the standalone proxy.
+    // When unset, falls back to /api/states so local dev keeps working.
+    const statesBase =
+      process.env.NEXT_PUBLIC_STATES_BASE_URL?.replace(/\/+$/, "") ?? "";
+    const statesPath = statesBase ? `${statesBase}/states` : "/api/states";
+
     async function fetchAircraft() {
       const b = getBounds();
       const url =
-        `/api/states` +
+        `${statesPath}` +
         `?lamin=${b.minLat.toFixed(4)}&lamax=${b.maxLat.toFixed(4)}` +
         `&lomin=${b.minLon.toFixed(4)}&lomax=${b.maxLon.toFixed(4)}`;
       setStatus("FETCH");

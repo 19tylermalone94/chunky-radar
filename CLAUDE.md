@@ -109,3 +109,4 @@ chore: bump next to 16.3
 - Open a PR back to `main`.
 - Include `Closes #N` in the PR body to auto-close the linked issue on merge.
 - PR title should match the commit format above.
+- **Before opening every PR, review `README.md` and update it** if the change affects features, architecture, environment variables, or rendering behavior. The README is user-facing — keep it accurate.

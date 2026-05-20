@@ -941,7 +941,7 @@ export default function FlightTracker() {
         if (isSelected) color = "#39ff14";
         else if (isHover) color = "#fff";
         else if (isEmergency) color = "#ff3838";
-        else if (a.onGround) color = "#888";
+        else if (a.onGround) color = "#ff3cf0";
         else color = "#ff3cf0";
         charCtx.fillStyle = color;
         if (a.onGround) {

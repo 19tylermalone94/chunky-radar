@@ -24,10 +24,7 @@
   └──────────────────────────────────────────────────────────────────┘
 ```
 
-Real-time flight radar with pixelated satellite maps, ASCII terrain glyphs, and a CRT-styled interface.
-
-> Public project / portfolio piece by Tyler Malone  
-> Built completely with **Claude Code**
+Real-time flight radar with pixelated satellite maps, ASCII terrain glyphs, and a CRT-styled
 
 ---
 

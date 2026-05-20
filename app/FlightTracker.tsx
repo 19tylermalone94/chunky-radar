@@ -557,6 +557,8 @@ export default function FlightTracker() {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef<HTMLDivElement>(null);
 
+  const proxyBase = process.env.NEXT_PUBLIC_STATES_BASE_URL?.replace(/\/+$/, "") ?? "";
+
   // UI state shown in chrome
   const [bbox, setBbox] = useState("--");
   const [planeCount, setPlaneCount] = useState(0);
@@ -566,6 +568,9 @@ export default function FlightTracker() {
   const [statusBlink, setStatusBlink] = useState(true);
   const [staleNotice, setStaleNotice] = useState<{ msg: string; level: "amber" | "red" } | null>(null);
   const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
+  const [proxyHealth, setProxyHealth] = useState<"UP" | "DEGRADED" | "DOWN" | null>(null);
+  const [proxyLastSuccess, setProxyLastSuccess] = useState<number | null>(null);
+  const [proxyLastError, setProxyLastError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
@@ -632,6 +637,23 @@ export default function FlightTracker() {
     const id = window.setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Proxy health: ping /healthz every 30s to detect unreachable proxy independently of the fetch cycle.
+  useEffect(() => {
+    if (!proxyBase) return;
+    async function ping() {
+      try {
+        await fetch(`${proxyBase}/healthz`, { method: "HEAD" });
+        setProxyHealth((h) => (h === "DOWN" ? "UP" : h));
+      } catch {
+        setProxyHealth("DOWN");
+        setProxyLastError("PROXY UNREACHABLE");
+      }
+    }
+    ping();
+    const id = window.setInterval(ping, 30_000);
+    return () => window.clearInterval(id);
+  }, [proxyBase]);
 
   // Fetch cities once.
   useEffect(() => {
@@ -1086,9 +1108,14 @@ export default function FlightTracker() {
           const ageSec = lastGoodFetchTime ? Math.round((Date.now() - lastGoodFetchTime) / 1000) : null;
           const reason = xUpstream ? `OPENSKY ${xUpstream}` : "STALE CACHE";
           setStaleNotice({ msg: ageSec != null ? `! ${reason} — DATA ${ageSec}S OLD` : `! ${reason}`, level: "amber" });
+          setProxyHealth("DEGRADED");
+          setProxyLastError(reason);
         } else {
           lastGoodFetchTime = Date.now();
           setStaleNotice(null);
+          setProxyHealth("UP");
+          setProxyLastSuccess(Date.now());
+          setProxyLastError(null);
         }
         const t = new Date(lastFetchTime);
         setUpdated(t.toTimeString().slice(0, 8));
@@ -1115,6 +1142,8 @@ export default function FlightTracker() {
         setStatusBlink(true);
         const detail = err instanceof Error ? err.message : "fetch failed";
         setStaleNotice({ msg: `! OPENSKY UNREACHABLE — ${detail.toUpperCase()}`, level: "red" });
+        setProxyHealth("DOWN");
+        setProxyLastError(detail.toUpperCase());
         console.warn("State fetch failed:", err);
       }
     }
@@ -1344,6 +1373,15 @@ export default function FlightTracker() {
         <span>
           <span className="label">STATUS</span>{" "}
           <span className={statusBlink ? "blink" : ""}>{status}</span>
+          {proxyBase && (
+            <span
+              className={`proxy-dot proxy-dot--${proxyHealth?.toLowerCase() ?? "unknown"}`}
+              title={[
+                proxyLastSuccess ? `LAST OK: ${new Date(proxyLastSuccess).toTimeString().slice(0, 8)}` : null,
+                proxyLastError ? `ERR: ${proxyLastError}` : null,
+              ].filter(Boolean).join(" │ ") || "CHECKING…"}
+            />
+          )}
         </span>
       </div>
 

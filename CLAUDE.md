@@ -61,13 +61,14 @@ Vercel, pinned to `fra1` (Frankfurt) — both for OpenSky proximity and to stay 
 
 ## Checks
 
-No linter is configured. The only automated check is TypeScript:
+**Run both of these before every push. No exceptions.**
 
 ```bash
-npx tsc --noEmit
+npx tsc --noEmit   # must print nothing
+npm run build      # must exit 0
 ```
 
-This must pass with zero errors before committing or opening a PR. Visual correctness requires running the dev server and looking at the map — there is no test suite.
+Vercel runs `npm run build` on every PR. If it fails there, it fails publicly and blocks the merge. A passing `tsc --noEmit` locally is not enough — Next.js build can catch additional errors. There is no test suite; visual correctness requires running the dev server.
 
 ## Git workflow
 
@@ -96,6 +97,7 @@ chore: bump next to 16.3
 ```
 
 ### Pull requests
-- Branch off `main`, open a PR back to `main`.
+- **Always branch off a fresh `main`.** Before starting any new issue, run `git checkout main && git pull` first — never branch off an in-progress feature branch.
+- Open a PR back to `main`.
 - Include `Closes #N` in the PR body to auto-close the linked issue on merge.
 - PR title should match the commit format above.

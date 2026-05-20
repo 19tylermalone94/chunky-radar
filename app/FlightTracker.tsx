@@ -672,13 +672,23 @@ export default function FlightTracker() {
     const composeCtx = composeCanvas.getContext("2d")!;
     const smallCtx = smallCanvas.getContext("2d", { willReadFrequently: true })!;
 
-    const view = { centerLat: 39.5, centerLon: -98.0, zoom: 4 };
+    const initParams = new URLSearchParams(window.location.search);
+    const _initLat = parseFloat(initParams.get("lat") ?? "");
+    const _initLon = parseFloat(initParams.get("lon") ?? "");
+    const _initZ   = parseFloat(initParams.get("z")   ?? "");
+    const view = {
+      centerLat: Number.isFinite(_initLat) ? Math.max(-85,  Math.min(85,  _initLat)) : 39.5,
+      centerLon: Number.isFinite(_initLon) ? Math.max(-180, Math.min(180, _initLon)) : -98.0,
+      zoom:      Number.isFinite(_initZ)   ? Math.max(2,    Math.min(18,  _initZ))   : 4,
+    };
     const tileCache = new Map<string, TileEntry>();
     let pendingTileLoads = 0;
+    const autoSelectIcao = initParams.get("icao24")?.toLowerCase() ?? null;
     let aircraft: Aircraft[] = [];
     let lastFetchTime = 0;
     let lastFetchOk = false;
     let lastGoodFetchTime = 0;
+    let urlDebounceTimer: number | null = null;
     let hoveredAircraft: Aircraft | null = null;
     let quantIndices: Uint8Array | null = null;
     let smallW = 0;
@@ -993,12 +1003,26 @@ export default function FlightTracker() {
       }
     }
 
+    function updateUrl() {
+      if (urlDebounceTimer !== null) window.clearTimeout(urlDebounceTimer);
+      urlDebounceTimer = window.setTimeout(() => {
+        const p = new URLSearchParams();
+        p.set("lat", view.centerLat.toFixed(4));
+        p.set("lon", view.centerLon.toFixed(4));
+        p.set("z",   view.zoom.toFixed(1));
+        if (selectedIdRef.current) p.set("icao24", selectedIdRef.current);
+        history.replaceState(null, "", "?" + p.toString());
+        urlDebounceTimer = null;
+      }, 250);
+    }
+
     function updateTopbar() {
       const b = getBounds();
       setBbox(
         `${b.minLat.toFixed(1)},${b.minLon.toFixed(1)} → ${b.maxLat.toFixed(1)},${b.maxLon.toFixed(1)}`
       );
       setZoomLabel(Math.floor(view.zoom));
+      updateUrl();
     }
 
     function frame() {
@@ -1071,6 +1095,13 @@ export default function FlightTracker() {
         setPlaneCount(aircraft.length);
         setStatus("OK");
         setStatusBlink(false);
+        if (autoSelectIcao && !selectedIdRef.current) {
+          const match = aircraft.find((a) => a.id.toLowerCase() === autoSelectIcao);
+          if (match) {
+            selectedIdRef.current = match.id;
+            setSelectedAircraft(match);
+          }
+        }
         if (selectedIdRef.current) {
           const fresh = aircraft.find((a) => a.id === selectedIdRef.current);
           setSelectedAircraft(fresh ?? null);
@@ -1287,6 +1318,7 @@ export default function FlightTracker() {
       window.clearInterval(pollTimer);
       window.clearInterval(tickTimer);
       if (fetchDebounceTimer !== null) window.clearTimeout(fetchDebounceTimer);
+      if (urlDebounceTimer !== null) window.clearTimeout(urlDebounceTimer);
       ro.disconnect();
       container.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mouseup", onMouseUp);

@@ -70,6 +70,50 @@ npm run build      # must exit 0
 
 Vercel runs `npm run build` on every PR. If it fails there, it fails publicly and blocks the merge. A passing `tsc --noEmit` locally is not enough — Next.js build can catch additional errors. There is no test suite; visual correctness requires running the dev server.
 
+## UI verification with Playwright
+
+For UI changes, verify visually by driving the actual browser. Playwright is not in `package.json` — install it temporarily, use it, then uninstall:
+
+```bash
+npm install --save-dev playwright
+npx playwright install chromium
+```
+
+Write the script inside the project directory (so Node can resolve `playwright` from `node_modules`) and use a `.cjs` extension:
+
+```bash
+node verify.cjs
+# clean up when done:
+npm uninstall playwright
+rm verify.cjs
+```
+
+Script template:
+
+```js
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch({ args: ['--no-sandbox'] });
+  const page = await browser.newPage();
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
+
+  await page.waitForSelector('.some-element', { timeout: 10000 });
+  await page.screenshot({ path: '/tmp/before.png' });
+
+  // interact, wait for data, screenshot again
+  await page.waitForTimeout(10000);
+  await page.screenshot({ path: '/tmp/after.png' });
+
+  await browser.close();
+})();
+```
+
+Key gotchas:
+- The dev server must already be running (`npm run dev`) before the script starts.
+- First OpenSky poll takes ~10 s — wait before asserting data-dependent UI.
+- Start the dev server with `run_in_background: true`, wait ~4 s, confirm it's up with `curl -s http://localhost:3000 | head -3`, then run the script.
+
 ## Git workflow
 
 ### BEFORE WRITING ANY CODE — mandatory branch setup

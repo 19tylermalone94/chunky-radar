@@ -16,15 +16,15 @@
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
 
   ┌──────────────────────────────────────────────────────────────────┐
-  │  src  : OpenSky Network · FlightAware AeroAPI · ESRI satellite  │
-  │  stack: Next.js 16 · React 19 · TypeScript · canvas (no libs)  │
-  │  map  : pixel-quantized tiles · ASCII terrain · nearest-neighbor│
-  │  ui   : two-canvas renderer · click-to-inspect · pan/zoom       │
-  │  feed : 8 s state poll · 60 s enrichment cache · proxy health   │
+  │  src  : OpenSky Network · FlightAware AeroAPI · ESRI satellite   │
+  │  stack: Next.js 16 · React 19 · TypeScript · canvas (no libs)    │
+  │  map  : pixel-quantized tiles · ASCII terrain · nearest-neighbor │
+  │  ui   : two-canvas renderer · click-to-inspect · pan/zoom        │
+  │  feed : 8 s state poll · 60 s enrichment cache · proxy health    │
   └──────────────────────────────────────────────────────────────────┘
 ```
 
-Real-time flight radar with pixelated satellite maps, ASCII terrain glyphs, and a CRT-styled
+Real-time flight radar with pixelated satellite maps, ASCII terrain glyphs, and a CRT-styled interface.
 
 ---
 

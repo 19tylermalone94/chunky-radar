@@ -72,16 +72,25 @@ Vercel runs `npm run build` on every PR. If it fails there, it fails publicly an
 
 ## Git workflow
 
-### Branch naming
-```
-{type}/{short-slug}
+### BEFORE WRITING ANY CODE — mandatory branch setup
 
+**Do this first. No exceptions. Do not touch any source file until these commands have run.**
+
+```bash
+git checkout main
+git pull
+git checkout -b {type}/{short-slug}
+```
+
+Branch naming uses conventional-commit types: `feat`, `fix`, `chore`, `refactor`, `docs`.
+
+```
 feat/flight-trail
 fix/ios-sprite-color
 chore/upgrade-next
 ```
 
-Types mirror conventional commits: `feat`, `fix`, `chore`, `refactor`, `docs`.
+Never branch off an in-progress feature branch. If `git branch` shows you are not on a new branch cut from the latest `main`, stop and fix it before proceeding.
 
 ### Issues
 Every piece of work should have a GitHub issue. If one doesn't exist, create it before starting. Issues live at the repo on GitHub (`gh issue create`).
@@ -97,7 +106,6 @@ chore: bump next to 16.3
 ```
 
 ### Pull requests
-- **Always branch off a fresh `main`.** Before starting any new issue, run `git checkout main && git pull` first — never branch off an in-progress feature branch.
 - Open a PR back to `main`.
 - Include `Closes #N` in the PR body to auto-close the linked issue on merge.
 - PR title should match the commit format above.

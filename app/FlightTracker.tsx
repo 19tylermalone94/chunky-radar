@@ -629,7 +629,8 @@ export default function FlightTracker() {
   // Filters: ref for the render loop to read live; state for the panel inputs.
   const filtersRef = useRef<Filters>(DEFAULT_FILTERS);
   const [filters, setFiltersState] = useState<Filters>(DEFAULT_FILTERS);
-  const dirtyRef = useRef(true);
+  const mapDirtyRef = useRef(true);
+  const overlayDirtyRef = useRef(true);
   const selectedIdRef = useRef<string | null>(null);
 
   // Tick "now" once a second so age fields refresh.
@@ -663,7 +664,7 @@ export default function FlightTracker() {
       .then((data: City[]) => {
         if (cancelled) return;
         citiesRef.current = data;
-        dirtyRef.current = true;
+        overlayDirtyRef.current = true;
       })
       .catch((e) => console.warn("cities load failed:", e));
     return () => { cancelled = true; };
@@ -672,12 +673,12 @@ export default function FlightTracker() {
   function patchFilters(patch: Partial<Filters>) {
     filtersRef.current = { ...filtersRef.current, ...patch };
     setFiltersState(filtersRef.current);
-    dirtyRef.current = true;
+    overlayDirtyRef.current = true;
   }
   function resetFilters() {
     filtersRef.current = { ...DEFAULT_FILTERS };
     setFiltersState(filtersRef.current);
-    dirtyRef.current = true;
+    overlayDirtyRef.current = true;
   }
 
   useEffect(() => {
@@ -689,10 +690,12 @@ export default function FlightTracker() {
 
     const composeCanvas = document.createElement("canvas");
     const smallCanvas = document.createElement("canvas");
+    const terrainCanvas = document.createElement("canvas");
     const mapCtx = mapCanvas.getContext("2d")!;
     const charCtx = charCanvas.getContext("2d")!;
     const composeCtx = composeCanvas.getContext("2d")!;
     const smallCtx = smallCanvas.getContext("2d", { willReadFrequently: true })!;
+    const terrainCtx = terrainCanvas.getContext("2d")!;
 
     const initParams = new URLSearchParams(window.location.search);
     const _initLat = parseFloat(initParams.get("lat") ?? "");
@@ -800,7 +803,7 @@ export default function FlightTracker() {
       img.onload = () => {
         entry.loaded = true;
         pendingTileLoads--;
-        dirtyRef.current = true;
+        mapDirtyRef.current = true;
         if (pendingTileLoads <= 0) loading.style.display = "none";
       };
       img.onerror = () => {
@@ -876,6 +879,33 @@ export default function FlightTracker() {
       mapCtx.drawImage(smallCanvas, 0, 0, smallW, smallH, 0, 0, cw, ch);
     }
 
+    function renderTerrain() {
+      const cw = charCanvas.width, ch = charCanvas.height;
+      if (terrainCanvas.width !== cw || terrainCanvas.height !== ch) {
+        terrainCanvas.width = cw;
+        terrainCanvas.height = ch;
+      }
+      terrainCtx.clearRect(0, 0, cw, ch);
+      if (!quantIndices) return;
+      const fs = PIXEL_FACTOR;
+      terrainCtx.font = `${fs - 1}px "VT323", "Courier New", monospace`;
+      terrainCtx.textBaseline = "middle";
+      terrainCtx.textAlign = "center";
+      terrainCtx.globalAlpha = 0.85;
+      for (let p = 0; p < PALETTE.length; p++) {
+        const ch_ = PALETTE_CHARS[p];
+        if (ch_ === " ") continue;
+        terrainCtx.fillStyle = PALETTE_TEXT[p];
+        for (let y = 0; y < smallH; y++) {
+          for (let x = 0; x < smallW; x++) {
+            if (quantIndices[y * smallW + x] !== p) continue;
+            terrainCtx.fillText(ch_, x * fs + fs / 2, y * fs + fs / 2);
+          }
+        }
+      }
+      terrainCtx.globalAlpha = 1.0;
+    }
+
     // Nose points up (negative Y). rotate(hdg * π/180) aligns it to heading.
     const PLANE_PATH = (() => {
       const p = new Path2D();
@@ -900,30 +930,7 @@ export default function FlightTracker() {
     function renderChars() {
       const cw = charCanvas.width, ch = charCanvas.height;
       charCtx.clearRect(0, 0, cw, ch);
-
-      if (quantIndices) {
-        const fs = PIXEL_FACTOR;
-        charCtx.font = `${fs - 1}px "VT323", "Courier New", monospace`;
-        charCtx.textBaseline = "middle";
-        charCtx.textAlign = "center";
-        charCtx.globalAlpha = 0.85;
-        for (let p = 0; p < PALETTE.length; p++) {
-          const ch_ = PALETTE_CHARS[p];
-          if (ch_ === " ") continue;
-          charCtx.fillStyle = PALETTE_TEXT[p];
-          for (let y = 0; y < smallH; y++) {
-            for (let x = 0; x < smallW; x++) {
-              if (quantIndices[y * smallW + x] !== p) continue;
-              charCtx.fillText(
-                ch_,
-                x * PIXEL_FACTOR + PIXEL_FACTOR / 2,
-                y * PIXEL_FACTOR + PIXEL_FACTOR / 2
-              );
-            }
-          }
-        }
-        charCtx.globalAlpha = 1.0;
-      }
+      charCtx.drawImage(terrainCanvas, 0, 0);
 
       // Cities
       if (filtersRef.current.showCities && citiesRef.current.length > 0) {
@@ -1048,11 +1055,16 @@ export default function FlightTracker() {
     }
 
     function frame() {
-      if (dirtyRef.current) {
+      if (mapDirtyRef.current) {
         renderMap();
-        renderChars();
+        renderTerrain();
         updateTopbar();
-        dirtyRef.current = false;
+        mapDirtyRef.current = false;
+        overlayDirtyRef.current = true;
+      }
+      if (overlayDirtyRef.current) {
+        renderChars();
+        overlayDirtyRef.current = false;
       }
       rafHandle = requestAnimationFrame(frame);
     }
@@ -1135,7 +1147,7 @@ export default function FlightTracker() {
           if (!fresh) selectedIdRef.current = null;
         }
         logCategoryHistogram(aircraft);
-        dirtyRef.current = true;
+        overlayDirtyRef.current = true;
       } catch (err) {
         lastFetchOk = false;
         setStatus("ERR");
@@ -1187,7 +1199,7 @@ export default function FlightTracker() {
           selectedIdRef.current = null;
           setSelectedAircraft(null);
         }
-        dirtyRef.current = true;
+        overlayDirtyRef.current = true;
       } else {
         scheduleFetch();
       }
@@ -1207,7 +1219,7 @@ export default function FlightTracker() {
       }
       const prevId = hoveredAircraft && hoveredAircraft.id;
       const newId = best && best.id;
-      if (prevId !== newId) dirtyRef.current = true;
+      if (prevId !== newId) overlayDirtyRef.current = true;
       hoveredAircraft = best;
       if (best) {
         showTooltip(best, mx, my);
@@ -1228,7 +1240,7 @@ export default function FlightTracker() {
           const cy = latToTileY(drag.lat, z) - dy / TILE_SIZE;
           view.centerLon = tileXToLon(cx, z);
           view.centerLat = Math.max(-85, Math.min(85, tileYToLat(cy, z)));
-          dirtyRef.current = true;
+          mapDirtyRef.current = true;
         }
       }
       updateHover(e);
@@ -1269,7 +1281,7 @@ export default function FlightTracker() {
       const dyPx = (my - mapCanvas.height / 2);
       view.centerLon = tileXToLon(ncx - dxPx / TILE_SIZE, newZoom);
       view.centerLat = Math.max(-85, Math.min(85, tileYToLat(ncy - dyPx / TILE_SIZE, newZoom)));
-      dirtyRef.current = true;
+      mapDirtyRef.current = true;
       scheduleFetch();
     }
 
@@ -1318,7 +1330,7 @@ export default function FlightTracker() {
       charCanvas.style.height = h + "px";
       composeCanvas.width = w;
       composeCanvas.height = h;
-      dirtyRef.current = true;
+      mapDirtyRef.current = true;
     }
 
     /* ---------- bind ---------- */
@@ -1623,7 +1635,7 @@ export default function FlightTracker() {
           onClose={() => {
             selectedIdRef.current = null;
             setSelectedAircraft(null);
-            dirtyRef.current = true;
+            overlayDirtyRef.current = true;
           }}
         />
       )}

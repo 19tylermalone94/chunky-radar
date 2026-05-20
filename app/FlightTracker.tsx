@@ -687,7 +687,6 @@ export default function FlightTracker() {
     let aircraft: Aircraft[] = [];
     let lastFetchTime = 0;
     let lastFetchOk = false;
-    let lastGoodFetchTime = 0;
     let urlDebounceTimer: number | null = null;
     let hoveredAircraft: Aircraft | null = null;
     let quantIndices: Uint8Array | null = null;

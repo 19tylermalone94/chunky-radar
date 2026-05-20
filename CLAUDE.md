@@ -96,6 +96,7 @@ chore: bump next to 16.3
 ```
 
 ### Pull requests
-- Branch off `main`, open a PR back to `main`.
+- **Always branch off a fresh `main`.** Before starting any new issue, run `git checkout main && git pull` first — never branch off an in-progress feature branch.
+- Open a PR back to `main`.
 - Include `Closes #N` in the PR body to auto-close the linked issue on merge.
 - PR title should match the commit format above.

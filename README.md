@@ -21,6 +21,7 @@ A Dwarf Fortress-style live flight tracker. Pixelated satellite imagery, ASCII t
 - **Profile panel** — Click any aircraft for a CRT-styled side panel with a pixelated category photo plus full state-vector fields and FlightAware enrichment (registration, type, operator, origin → destination, status, ASCII progress bar, delays, ETA, filed altitude/airspeed/route, gates).
 - **Pan + zoom** — Click-drag to pan, scroll wheel zooms toward the cursor; wheel input is accumulator-debounced so trackpads don't jump multiple levels per flick.
 - **Proxy health dot** — A small status dot next to STATUS in the topbar reflects VPS proxy health in real time: green (up), amber (proxy reachable but OpenSky returning stale data), red (proxy unreachable). Hover for last-success time and last-error detail.
+- **Spotter panel** — Toggle via `▲ SPOTTER` in the bottombar. A compact bottom-left overlay showing live aggregate stats for whatever's in the current viewport: total/airborne/on-ground counts, average altitude, max speed, altitude band histogram (LOW/MID/HIGH/UNK), vertical trend mix (climb/level/descend), top aircraft types, top operators by callsign prefix (UAL, SWA, DAL…), top countries, and position-source breakdown (ADS-B/MLAT). All computed from already-loaded data each poll cycle and on every filter change — no extra fetches.
 
 ## Stack
 

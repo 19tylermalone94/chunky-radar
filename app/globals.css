@@ -394,3 +394,79 @@ html, body {
   font-size: 9px; text-align: center;
   text-shadow: 0 0 4px var(--amber);
 }
+
+/* ----- Spotter panel ----- */
+.spotter {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 8px 10px 10px;
+  font-family: var(--font-vt323), monospace;
+  font-size: 16px;
+  line-height: 1.05;
+  color: var(--fg);
+  text-shadow: 0 0 4px var(--fg);
+  width: 216px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  pointer-events: auto;
+  box-shadow: 0 0 12px rgba(57,255,20,0.15);
+}
+.spotter-ttl {
+  font-family: var(--font-press-start), monospace;
+  font-size: 8px;
+  color: var(--amber);
+  margin: 9px 0 3px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 4px var(--amber);
+}
+.spotter-close {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 18px; height: 18px;
+  background: #000;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--font-vt323), monospace;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.spotter-close:hover { background: var(--border); color: #fff; }
+.spotter-mono {
+  font-family: var(--font-vt323), monospace;
+  font-size: 16px;
+  line-height: 1.1;
+  white-space: pre;
+}
+.spotter-emerg {
+  color: #ff8a8a;
+  text-shadow: 0 0 4px #ff3838;
+  font-family: var(--font-press-start), monospace;
+  font-size: 9px;
+  margin-top: 3px;
+  animation: blink 1s steps(2) infinite;
+}
+
+/* Spotter toggle button in bottombar */
+.spotter-toggle {
+  background: #000;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--font-vt323), monospace;
+  font-size: 16px;
+  padding: 1px 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.spotter-toggle:hover { background: var(--border); color: #fff; }
+.spotter-toggle--on {
+  border-color: var(--fg);
+  color: var(--amber);
+  text-shadow: 0 0 4px var(--amber);
+}

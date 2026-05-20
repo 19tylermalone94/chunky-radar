@@ -825,11 +825,26 @@ export default function FlightTracker() {
       mapCtx.drawImage(smallCanvas, 0, 0, smallW, smallH, 0, 0, cw, ch);
     }
 
-    // ✈ glyph points NE by default. Canvas Y is down, so rotating by
-    // (heading - 45)° aligns the nose with the heading. Force text-style
-    // rendering with VS-15 (U+FE0E) so fillStyle isn't overridden by a color
-    // emoji glyph.
-    const PLANE_GLYPH = "✈︎";
+    // Nose points up (negative Y). rotate(hdg * π/180) aligns it to heading.
+    const PLANE_PATH = (() => {
+      const p = new Path2D();
+      p.moveTo(0, -9);    // nose tip
+      p.lineTo(2, -4);    // right fuselage shoulder
+      p.lineTo(8, 0);     // right wing tip
+      p.lineTo(7, 2);     // right wing trailing
+      p.lineTo(2, 1);     // right wing root
+      p.lineTo(3, 6);     // right tail tip
+      p.lineTo(1, 7);     // right tail trailing
+      p.lineTo(0, 5);     // tail center notch
+      p.lineTo(-1, 7);    // left tail trailing
+      p.lineTo(-3, 6);    // left tail tip
+      p.lineTo(-2, 1);    // left wing root
+      p.lineTo(-7, 2);    // left wing trailing
+      p.lineTo(-8, 0);    // left wing tip
+      p.lineTo(-2, -4);   // left fuselage shoulder
+      p.closePath();
+      return p;
+    })();
 
     function renderChars() {
       const cw = charCanvas.width, ch = charCanvas.height;
@@ -911,9 +926,6 @@ export default function FlightTracker() {
       }
 
       // Aircraft
-      charCtx.font = `20px "VT323", "Courier New", monospace`;
-      charCtx.textBaseline = "middle";
-      charCtx.textAlign = "center";
       charCtx.shadowColor = "rgba(0,0,0,0.9)";
       charCtx.shadowBlur = 3;
       let visible = 0;
@@ -929,18 +941,20 @@ export default function FlightTracker() {
         if (isSelected) color = "#39ff14";
         else if (isHover) color = "#fff";
         else if (isEmergency) color = "#ff3838";
-        else if (a.onGround) color = "#888";
+        else if (a.onGround) color = "#ff3cf0";
         else color = "#ff3cf0";
         charCtx.fillStyle = color;
         if (a.onGround) {
-          charCtx.fillText("o", s.x, s.y);
+          charCtx.beginPath();
+          charCtx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+          charCtx.fill();
         } else {
           charCtx.save();
           charCtx.translate(s.x, s.y);
           if (a.hdg != null && !isNaN(a.hdg)) {
-            charCtx.rotate(((a.hdg - 45) * Math.PI) / 180);
+            charCtx.rotate((a.hdg * Math.PI) / 180);
           }
-          charCtx.fillText(PLANE_GLYPH, 0, 0);
+          charCtx.fill(PLANE_PATH);
           charCtx.restore();
         }
         if (isSelected) {

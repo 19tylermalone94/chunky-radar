@@ -14,70 +14,49 @@
 ██╔══██╗██╔══██║██║  ██║██╔══██║██╔══██╗
 ██║  ██║██║  ██║██████╔╝██║  ██║██║  ██║
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  src  : OpenSky Network · FlightAware AeroAPI · ESRI satellite  │
+  │  stack: Next.js 16 · React 19 · TypeScript · canvas (no libs)  │
+  │  map  : pixel-quantized tiles · ASCII terrain · nearest-neighbor│
+  │  ui   : two-canvas renderer · click-to-inspect · pan/zoom       │
+  │  feed : 8 s state poll · 60 s enrichment cache · proxy health   │
+  └──────────────────────────────────────────────────────────────────┘
 ```
 
-A chunky little live flight tracker with pixelated maps, ASCII terrain, and a CRT-ish interface that feels somewhere between an old terminal, a strategy game, and a radar screen that got left on too long.
-
-**Live aircraft. Retro map. Weirdly pleasant to stare at.**
+Real-time flight radar with pixelated satellite maps, ASCII terrain glyphs, and a CRT-styled interface.
 
 > Public project / portfolio piece by Tyler Malone  
 > Built completely with **Claude Code**
 
 ---
 
-## What it is
-
-`chunky-radar` is a real-time flight viewer styled like a low-fi simulation console.
-
-Instead of going for slick aviation-dashboard polish, it leans hard into:
-- pixelated satellite imagery
-- ASCII terrain glyphs
-- chunky aircraft rendering
-- green/amber CRT vibes
-- a UI that feels more like a place than a product
-
-It’s less “enterprise flight intelligence platform” and more “cool radar thing you open in a tab and keep poking at.”
-
----
-
 ## Features
 
-- **Live aircraft positions** from OpenSky
-- **Pixel map rendering** with downscaled/upscaled satellite imagery
-- **ASCII terrain overlay** for coastlines, plains, forest, mountains, snow, and water
-- **Clickable aircraft profiles** with extra flight details and flight enrichment
-- **Filters** for altitude, airborne/grounded, emergency squawks, categories, and more
-- **Pan + zoom** over the map like a proper little radar table
-- **Spotter panel** for live viewport stats
-- **Proxy health indicator** so you can tell whether the feed is healthy or limping
-
----
-
-## Why it exists
-
-Because flight trackers are usually too clean.
-
-I wanted something that felt:
-- more tactile
-- more game-like
-- a little strange in a good way
-- visually memorable enough to stand on its own as a project
-
-This is basically a personal/public experiment in turning live aviation data into a tiny interactive world.
+- **Live aircraft positions** from OpenSky Network, updated every 8 seconds
+- **Pixel map rendering** — ESRI satellite tiles downscaled, color-quantized to a 16-entry retro palette, and upscaled with nearest-neighbor
+- **ASCII terrain overlay** — coastlines, plains, forest, mountains, snow, and water classified into glyphs (`~` ocean, `♣` forest, `▲` mountain, etc.)
+- **Aircraft sprites** — Path2D polygon shapes rotated by heading; on-ground aircraft render as dots
+- **Clickable aircraft profiles** — enriched with FlightAware AeroAPI data (origin, destination, aircraft type, operator)
+- **Filters** — altitude range, airborne/grounded toggle, emergency squawk, aircraft category, and more
+- **Pan + zoom** across the map canvas
+- **Spotter panel** — live viewport stats (aircraft count, altitude distribution, coverage area)
+- **Proxy health indicator** — shows feed source and upstream status
 
 ---
 
 ## Stack
 
-- **Next.js**
-- **React**
+- **Next.js 16** (App Router)
+- **React 19**
 - **TypeScript**
-- layered **canvas** rendering
-- OpenSky for aircraft state data
-- FlightAware for enrichment
-- ESRI imagery for the map base
+- Layered **canvas** rendering — two-canvas architecture: pixel map below, character overlay redrawn every animation frame
+- **OpenSky Network** — aircraft state vectors (`/states/all`)
+- **FlightAware AeroAPI** — per-flight enrichment (origin, destination, aircraft details)
+- **ESRI World Imagery** — slippy map tiles for the satellite base
+- **Press Start 2P** + **VT323** — fonts
 
-No heavy mapping library. No bloated UI kit. Just a deliberately hand-built rendering setup.
+No external mapping library. No UI component kit. Hand-built tile fetching and rendering pipeline.
 
 ---
 
@@ -86,32 +65,22 @@ No heavy mapping library. No bloated UI kit. Just a deliberately hand-built rend
 ```bash
 npm install
 cp .env.local.example .env.local
+# fill in keys, then:
 npm run dev
 ```
 
-Then open:
-
-```bash
-http://localhost:3000
-```
+Open `http://localhost:3000`. Without a proxy URL set, the client falls back to `/api/states`, which works fine from a local IP.
 
 ---
 
 ## Environment variables
 
-- `NEXT_PUBLIC_STATES_BASE_URL`  
-  Base URL for the aircraft-state proxy
-
-- `OPENSKY_CLIENT_ID`  
-  OpenSky OAuth client ID
-
-- `OPENSKY_CLIENT_SECRET`  
-  OpenSky OAuth client secret
-
-- `FLIGHTAWARE_API_KEY`  
-  FlightAware AeroAPI key for enriched aircraft details
-
-If you don’t provide all of them, the app still works in a reduced or fallback mode.
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_STATES_BASE_URL` | No | VPS proxy base URL — omit for local dev, falls back to `/api/states` |
+| `OPENSKY_CLIENT_ID` | No | OAuth2 client ID — falls back to anonymous tier if missing |
+| `OPENSKY_CLIENT_SECRET` | No | OAuth2 client secret — falls back to anonymous tier if missing |
+| `FLIGHTAWARE_API_KEY` | No | Paid per-request; aircraft panel shows OpenSky-only data if absent |
 
 Get OpenSky credentials at <https://opensky-network.org/> and a FlightAware AeroAPI key at <https://flightaware.com/aeroapi/portal/>.
 
@@ -129,23 +98,25 @@ Get OpenSky credentials at <https://opensky-network.org/> and a FlightAware Aero
             ┌────────────┐
  browser ── │  Next.js   │ ── ESRI World Imagery tiles
   fallback  │    app     │
-            │            │ ── /api/states fallback for local dev
-            │            │ ── /api/aircraft/[icao24] for enrichment
+            │            │ ── /api/states (fallback, local dev)
+            │            │ ── /api/aircraft/[icao24] (FlightAware enrichment)
             └────────────┘
 ```
 
-The app prefers the VPS proxy for aircraft state data and falls back to local API routes when needed. Caching keeps the thing from melting upstream APIs every time someone opens the page.
+The browser prefers the VPS proxy for aircraft state data (`NEXT_PUBLIC_STATES_BASE_URL`) and falls back to the Vercel API route when that variable is unset. OpenSky blocks Vercel/AWS/GCP IP ranges at the TCP level — the proxy runs on Hetzner CX22 in Frankfurt to stay outside those ranges.
+
+Both the proxy and the Next.js API routes use `globalThis`-based in-memory caches (8 s for states, 60 s for enrichment) keyed by bounding box and callsign respectively.
 
 ---
 
 ## Deployment
 
-Deploy on Vercel, with a separate proxy for OpenSky access where needed.
+Deployed on Vercel, pinned to `fra1` (Frankfurt) for OpenSky proximity. The standalone proxy runs separately on Hetzner; see `proxy/README.md` for setup.
 
-If you fork it for your own use, keep an eye on:
-- OpenSky rate limits
-- FlightAware cost / request volume
-- public traffic against the API routes
+Things to watch if you fork it:
+- OpenSky anonymous tier is rate-limited — OAuth credentials give higher quota
+- FlightAware AeroAPI is billed per request — enrichment is triggered per aircraft click
+- The VPS proxy is essential for production; Vercel egress IPs are blocked by OpenSky
 
 ---
 
@@ -156,15 +127,3 @@ If you fork it for your own use, keep an eye on:
 - **ESRI World Imagery** — map tiles
 - **Wikimedia Commons** — aircraft thumbnails
 - **Press Start 2P** and **VT323** — fonts
-- aesthetic inspiration: old terminals, sim UIs, and games that make data feel alive
-
----
-
-## Notes
-
-This repo is intentionally a little opinionated.
-
-It’s not trying to be the most practical flight tracker.  
-It’s trying to be the coolest version of this idea.
-
-If that’s your kind of thing, poke around.

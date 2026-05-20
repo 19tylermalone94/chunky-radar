@@ -381,12 +381,14 @@ function ProfilePanel({
   nowSec,
   enrichment,
   enrichmentLoading,
+  enrichmentError,
   onClose,
 }: {
   a: Aircraft;
   nowSec: number;
   enrichment: Enrichment | null;
   enrichmentLoading: boolean;
+  enrichmentError: string | null;
   onClose: () => void;
 }) {
   const emergency = emergencyFromSquawk(a.squawk);
@@ -444,6 +446,10 @@ function ProfilePanel({
       <Row k="SENSORS" v={a.sensors ? String(a.sensors.length) : "—"} />
 
       {enrichmentLoading && <div className="profile-loading">LOADING FA DATA…</div>}
+
+      {enrichmentError && !enrichmentLoading && (
+        <div className="profile-fa-error">! {enrichmentError}</div>
+      )}
 
       {enrichment && (
         <>
@@ -558,6 +564,8 @@ export default function FlightTracker() {
   const [zoomLabel, setZoomLabel] = useState(4);
   const [status, setStatus] = useState<"BOOT" | "FETCH" | "OK" | "ERR">("BOOT");
   const [statusBlink, setStatusBlink] = useState(true);
+  const [staleNotice, setStaleNotice] = useState<{ msg: string; level: "amber" | "red" } | null>(null);
+  const [enrichmentError, setEnrichmentError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
@@ -573,29 +581,39 @@ export default function FlightTracker() {
   useEffect(() => {
     if (!selId) {
       setEnrichment(null);
+      setEnrichmentError(null);
       setEnrichmentLoading(false);
       return;
     }
     // No callsign -> nothing useful to look up.
     if (!selCallsign || selCallsign === selId) {
       setEnrichment(null);
+      setEnrichmentError(null);
       setEnrichmentLoading(false);
       return;
     }
     const ac = new AbortController();
     setEnrichment(null);
+    setEnrichmentError(null);
     setEnrichmentLoading(true);
     fetch(
       `/api/aircraft/${encodeURIComponent(selId)}?callsign=${encodeURIComponent(selCallsign)}`,
       { signal: ac.signal },
     )
-      .then((r) => r.json())
-      .then((j) => {
-        setEnrichment(j.flight ?? null);
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) {
+          setEnrichmentError(`FLIGHTAWARE ${r.status}`);
+          setEnrichment(null);
+        } else {
+          setEnrichmentError(null);
+          setEnrichment(j.flight ?? null);
+        }
         setEnrichmentLoading(false);
       })
       .catch((e) => {
         if ((e as Error).name !== "AbortError") {
+          setEnrichmentError("FLIGHTAWARE UNAVAILABLE");
           setEnrichment(null);
           setEnrichmentLoading(false);
         }
@@ -660,6 +678,7 @@ export default function FlightTracker() {
     let aircraft: Aircraft[] = [];
     let lastFetchTime = 0;
     let lastFetchOk = false;
+    let lastGoodFetchTime = 0;
     let hoveredAircraft: Aircraft | null = null;
     let quantIndices: Uint8Array | null = null;
     let smallW = 0;
@@ -1009,6 +1028,8 @@ export default function FlightTracker() {
       setStatusBlink(true);
       try {
         const r = await fetch(url);
+        const xCache = r.headers.get("x-cache") ?? "";
+        const xUpstream = r.headers.get("x-upstream-status");
         if (!r.ok) throw new Error("HTTP " + r.status);
         const data: OpenSkyResponse = await r.json();
         const states = data.states || [];
@@ -1036,6 +1057,15 @@ export default function FlightTracker() {
           }));
         lastFetchOk = true;
         lastFetchTime = Date.now();
+        const isStale = xCache === "STALE" || xCache === "STALE-ERR";
+        if (isStale) {
+          const ageSec = lastGoodFetchTime ? Math.round((Date.now() - lastGoodFetchTime) / 1000) : null;
+          const reason = xUpstream ? `OPENSKY ${xUpstream}` : "STALE CACHE";
+          setStaleNotice({ msg: ageSec != null ? `! ${reason} — DATA ${ageSec}S OLD` : `! ${reason}`, level: "amber" });
+        } else {
+          lastGoodFetchTime = Date.now();
+          setStaleNotice(null);
+        }
         const t = new Date(lastFetchTime);
         setUpdated(t.toTimeString().slice(0, 8));
         setPlaneCount(aircraft.length);
@@ -1052,6 +1082,8 @@ export default function FlightTracker() {
         lastFetchOk = false;
         setStatus("ERR");
         setStatusBlink(true);
+        const detail = err instanceof Error ? err.message : "fetch failed";
+        setStaleNotice({ msg: `! OPENSKY UNREACHABLE — ${detail.toUpperCase()}`, level: "red" });
         console.warn("State fetch failed:", err);
       }
     }
@@ -1487,6 +1519,9 @@ export default function FlightTracker() {
         <canvas ref={mapCanvasRef} className="map-canvas" />
         <canvas ref={charCanvasRef} className="char-canvas" />
         <div ref={loadingRef} className="loading">LOADING TILES...</div>
+        {staleNotice && (
+          <div className={`stale-strip stale-strip--${staleNotice.level}`}>{staleNotice.msg}</div>
+        )}
         <div className="legend">
           <div className="ttl">TERRAIN</div>
           <div className="row"><span className="sym" style={{ color: "#6cf" }}>~</span> OCEAN</div>
@@ -1514,6 +1549,7 @@ export default function FlightTracker() {
           nowSec={nowSec}
           enrichment={enrichment}
           enrichmentLoading={enrichmentLoading}
+          enrichmentError={enrichmentError}
           onClose={() => {
             selectedIdRef.current = null;
             setSelectedAircraft(null);

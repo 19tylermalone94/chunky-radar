@@ -350,3 +350,34 @@ html, body {
   letter-spacing: 1px;
 }
 .profile-links a:hover { background: var(--border); color: #fff; }
+
+.stale-strip {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 15;
+  padding: 4px 10px;
+  font-family: var(--font-press-start), monospace;
+  font-size: 9px; letter-spacing: 1px;
+  text-align: center; pointer-events: none;
+}
+.stale-strip--amber {
+  background: rgba(80, 50, 0, 0.92);
+  border-bottom: 1px solid var(--amber);
+  color: var(--amber);
+  text-shadow: 0 0 4px var(--amber);
+}
+.stale-strip--red {
+  background: rgba(80, 0, 0, 0.92);
+  border-bottom: 1px solid #ff3838;
+  color: #ff8a8a;
+  text-shadow: 0 0 4px #ff3838;
+}
+
+.profile-fa-error {
+  background: rgba(80, 40, 0, 0.5);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  padding: 5px 8px;
+  margin: 10px 0 4px;
+  font-family: var(--font-press-start), monospace;
+  font-size: 9px; text-align: center;
+  text-shadow: 0 0 4px var(--amber);
+}
